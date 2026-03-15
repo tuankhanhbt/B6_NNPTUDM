@@ -28,9 +28,10 @@ router.post('/login', async function (req, res, next) {
   let result = bcrypt.compareSync(password, getUser.password);
   if (result) {
     let token = jwt.sign({
-      id: getUser._id,
-      exp: Date.now() + 3600 * 1000
-    }, "HUTECH")
+      id: getUser._id
+    }, "HUTECH", {
+      expiresIn: '1h'
+    })
     res.cookie("token", token, {
       httpOnly: true,
       maxAge: 60 * 60 * 1000
@@ -56,10 +57,23 @@ router.post('/logout', checkLogin, function (req, res, next) {
 })
 router.post('/changepassword', checkLogin, async function (req, res, next) {
   let { oldPassword, newPassword } = req.body;
-  let user = await userController.FindByID(req.userId);
-  if (bcrypt.compareSync(oldPassword, user.password)) {
-    user.password = newPassword;
+  if (!oldPassword || !newPassword) {
+    return res.status(400).send({
+      message: "oldPassword va newPassword la bat buoc"
+    })
   }
+  let user = await userController.FindByID(req.userId);
+  if (!user) {
+    return res.status(404).send({
+      message: "khong tim thay user"
+    })
+  }
+  if (!bcrypt.compareSync(oldPassword, user.password)) {
+    return res.status(400).send({
+      message: "oldPassword khong dung"
+    })
+  }
+  user.password = newPassword;
   await user.save();
   res.send("da cap nhat password")
 })

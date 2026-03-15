@@ -1,5 +1,10 @@
 let jwt = require('jsonwebtoken')
 let userController = require("../controllers/users");
+
+function normalizeRoleName(roleName) {
+    return String(roleName || "").trim().toUpperCase();
+}
+
 module.exports = {
     checkLogin: function (req, res, next) {
         try {
@@ -9,7 +14,7 @@ module.exports = {
             }
             else {
                 let authorizationToken = req.headers.authorization;
-                if (!authorizationToken.startsWith("Bearer")) {
+                if (!authorizationToken || !authorizationToken.startsWith("Bearer ")) {
                     res.status(403).send({
                         message: "ban chua dang nhap"
                     })
@@ -18,14 +23,8 @@ module.exports = {
                 token = authorizationToken.split(' ')[1];
             }
             let result = jwt.verify(token, 'HUTECH');
-            if (result.exp > Date.now()) {
-                req.userId = result.id;
-                next();
-            } else {
-                res.status(403).send({
-                    message: "ban chua dang nhap"
-                })
-            }
+            req.userId = result.id;
+            next();
         } catch (error) {
             res.status(403).send({
                 message: "ban chua dang nhap"
@@ -35,12 +34,24 @@ module.exports = {
     },
     checkRole: function (...requiredRole) {
         return async function (req, res, next) {
-            let userId = req.userId;
-            let getUser = await userController.FindByID(userId);
-            let roleName = getUser.role.name;
-            if (requiredRole.includes(roleName)) {
-                next()
-            } else {
+            try {
+                let userId = req.userId;
+                let getUser = await userController.FindByID(userId);
+                if (!getUser || !getUser.role) {
+                    return res.status(403).send({
+                        message: "ban khong co quyen"
+                    });
+                }
+                let roleName = normalizeRoleName(getUser.role.name);
+                let normalizedRequiredRoles = requiredRole.map(normalizeRoleName);
+                if (normalizedRequiredRoles.includes(roleName)) {
+                    next()
+                } else {
+                    res.status(403).send({
+                        message: "ban khong co quyen"
+                    })
+                }
+            } catch (error) {
                 res.status(403).send({
                     message: "ban khong co quyen"
                 })
